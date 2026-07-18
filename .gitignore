@@ -4,3 +4,8 @@ backup/*
 !backup/.gitkeep
 
 umami.code*
+
+__pycache__/
+*.pyc
+.venv/
+venv/

@@ -21,7 +21,76 @@ services:
       retries: 5
     labels:
       caddy_0: stats.ildeposito.org
-      caddy_0.reverse_proxy: "{{upstreams 3000}}"
+
+      # Named matchers -----------------------------------------------------
+      # Tracking script + collection endpoint: must stay public for the
+      # snippet embedded on third-party sites to work for anonymous visitors.
+      caddy_0.@umami_public.path: /script.js /api/send /api/send/*
+      # Umami's own credential-based login is disabled: Authelia is the only
+      # front door. /login redirects home instead of 404ing so that a stray
+      # visit (e.g. an old bookmark) re-enters the normal SSO flow.
+      caddy_0.@umami_login_page.path: /login
+      caddy_0.@umami_native_login_api.path: /api/auth/login
+      # The rest of the REST API enforces its own Bearer/API-key auth, so it
+      # doesn't need (and shouldn't get, for external API-key consumers)
+      # Authelia in front of it.
+      caddy_0.@umami_api.path: /api/*
+      # First hit after an Authelia login has no local Umami session yet.
+      caddy_0.@umami_needs_bootstrap.not.header: "Cookie *umami_sso=*"
+
+      # Single ordered route -------------------------------------------------
+      # Everything lives in one `route` block so execution order is explicit
+      # and doesn't depend on Caddy's automatic directive sorting.
+      caddy_0.route.0_request_header: "-Remote-User"
+      caddy_0.route.1_request_header: "-Remote-Groups"
+      caddy_0.route.2_request_header: "-Remote-Email"
+      caddy_0.route.3_request_header: "-X-Internal-Bridge-Secret"
+
+      caddy_0.route.4_handle: "@umami_public"
+      caddy_0.route.4_handle.0_reverse_proxy: "{{upstreams 3000}}"
+
+      caddy_0.route.5_handle: "@umami_login_page"
+      caddy_0.route.5_handle.0_redir: "/"
+
+      caddy_0.route.6_handle: "@umami_native_login_api"
+      caddy_0.route.6_handle.0_respond: "404"
+
+      caddy_0.route.7_handle: "@umami_api"
+      caddy_0.route.7_handle.0_reverse_proxy: "{{upstreams 3000}}"
+
+      # Anything else (the dashboard UI) requires Authelia.
+      caddy_0.route.8_forward_auth: authelia:9091
+      caddy_0.route.8_forward_auth.uri: /api/authz/forward-auth
+      caddy_0.route.8_forward_auth.copy_headers: "Remote-User Remote-Groups Remote-Email"
+
+      caddy_0.route.9_handle: "@umami_needs_bootstrap"
+      caddy_0.route.9_handle.0_request_header: "+X-Internal-Bridge-Secret ${SSO_BRIDGE_SHARED_SECRET}"
+      caddy_0.route.9_handle.1_reverse_proxy: "sso-bridge:8000"
+
+      caddy_0.route.10_handle: ""
+      caddy_0.route.10_handle.0_reverse_proxy: "{{upstreams 3000}}"
+
+  sso-bridge:
+    build: ./sso-bridge
+    container_name: ildeposito_stats_sso_bridge
+    environment:
+      DATABASE_URL: postgresql://umami_sso_bridge:${SSO_BRIDGE_DB_PASSWORD}@db:5432/umami
+      APP_SECRET: ${APP_SECRET}
+      SSO_BRIDGE_SHARED_SECRET: ${SSO_BRIDGE_SHARED_SECRET}
+      SSO_COOKIE_MAX_AGE: ${SSO_COOKIE_MAX_AGE:-600}
+    depends_on:
+      db:
+        condition: service_healthy
+    init: true
+    restart: always
+    networks:
+      - ildeposito-stats-internal
+      - caddy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   db:
     image: postgres:15-alpine
@@ -30,8 +99,10 @@ services:
       POSTGRES_DB: umami
       POSTGRES_USER: umami
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      SSO_BRIDGE_DB_PASSWORD: ${SSO_BRIDGE_DB_PASSWORD}
     volumes:
       - umami-db-data:/var/lib/postgresql/data
+      - ./db-init:/docker-entrypoint-initdb.d:ro
     restart: always
     networks:
       - ildeposito-stats-internal
