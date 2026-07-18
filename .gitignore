@@ -2,3 +2,5 @@
 
 backup/*
 !backup/.gitkeep
+
+umami.code*
