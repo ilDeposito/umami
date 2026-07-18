@@ -117,7 +117,14 @@ function sendBootstrapPage(res, token, redirectTarget, nonce) {
 <p>Accesso in corso&hellip;</p>
 <noscript>Devi abilitare JavaScript per accedere a Umami.</noscript>
 <script nonce="${nonce}">
-localStorage.setItem("umami.auth", ${JSON.stringify(token)});
+// Umami's own storage helper JSON-encodes values before writing them
+// (src/lib/storage.ts: localStorage.setItem(key, JSON.stringify(data))),
+// so the token must be JSON-stringified at runtime here too, not just
+// safely embedded as a JS literal -- otherwise Umami's getItem() calls
+// JSON.parse() on a raw, unquoted string, fails, and silently treats the
+// session as absent.
+var token = ${JSON.stringify(token)};
+localStorage.setItem("umami.auth", JSON.stringify(token));
 window.location.replace(${JSON.stringify(redirectTarget)});
 </script>
 </body></html>`;
