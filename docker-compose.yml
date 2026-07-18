@@ -49,8 +49,17 @@ services:
       caddy_0.route.4_handle: "@umami_public"
       caddy_0.route.4_handle.0_reverse_proxy: "{{upstreams 3000}}"
 
+      # Umami's own logout button clears its local token then does a real
+      # (non-SPA) navigation to /login -- reuse that same signal to also
+      # end the Authelia SSO session (single sign-out), otherwise the
+      # umami_sso marker cookie outlives the Umami session and the next
+      # visit skips straight back into a half-logged-in state. A stray
+      # visit to /login (e.g. an old bookmark) gets the same treatment,
+      # which is fine: Umami's native login is disabled either way, so
+      # the only sane outcome of landing here is re-entering SSO.
       caddy_0.route.5_handle: "@umami_login_page"
-      caddy_0.route.5_handle.0_redir: "/ 302"
+      caddy_0.route.5_handle.0_header: 'Set-Cookie "umami_sso=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax"'
+      caddy_0.route.5_handle.1_redir: "https://auth.ildeposito.org/logout?rd=https://stats.ildeposito.org/ 302"
 
       caddy_0.route.6_handle: "@umami_native_login_api"
       caddy_0.route.6_handle.0_respond: "404"
