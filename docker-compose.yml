@@ -1,0 +1,50 @@
+---
+services:
+  umami:
+    image: ghcr.io/umami-software/umami:3.2.0
+    container_name: ildeposito_stats_umami
+    environment:
+      DATABASE_URL: postgresql://umami:${POSTGRES_PASSWORD}@db:5432/umami
+      APP_SECRET: ${APP_SECRET}
+    depends_on:
+      db:
+        condition: service_healthy
+    init: true
+    restart: always
+    networks:
+      - ildeposito-stats-internal
+      - caddy
+    healthcheck:
+      test: ["CMD-SHELL", "curl http://localhost:3000/api/heartbeat"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    labels:
+      caddy_0: umami.ildeposito.org
+      caddy_0.reverse_proxy: "{{upstreams 3000}}"
+
+  db:
+    image: postgres:15-alpine
+    container_name: ildeposito_stats_postgres
+    environment:
+      POSTGRES_DB: umami
+      POSTGRES_USER: umami
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - umami-db-data:/var/lib/postgresql/data
+    restart: always
+    networks:
+      - ildeposito-stats-internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+volumes:
+  umami-db-data:
+
+networks:
+  ildeposito-stats-internal:
+    driver: bridge
+  caddy:
+    external: true
