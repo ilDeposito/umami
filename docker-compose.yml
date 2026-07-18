@@ -20,7 +20,7 @@ services:
       timeout: 5s
       retries: 5
     labels:
-      caddy_0: umami.ildeposito.org
+      caddy_0: stats.ildeposito.org
       caddy_0.reverse_proxy: "{{upstreams 3000}}"
 
   db:
