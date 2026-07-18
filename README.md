@@ -21,8 +21,8 @@ visitor is logged in. This stack adds a small internal service,
 3. `sso-bridge` looks up the Umami account with that exact username
    (accounts are **not** auto-provisioned — see below), and mints a Umami
    session token using the same algorithm Umami's own `/api/auth/login`
-   uses (`sso-bridge/crypto.py`, verified byte-for-byte against Umami's
-   Node implementation). It never needs, sees, or stores any password —
+   uses (`sso-bridge/crypto.js`, ported directly from Umami's own
+   `src/lib/crypto.ts`). It never needs, sees, or stores any password —
    Authelia's or Umami's.
 4. It returns a tiny HTML page that writes that token into
    `localStorage`, sets the `umami_sso` cookie, and redirects to the

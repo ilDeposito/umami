@@ -1,0 +1,15 @@
+{
+  "name": "umami-sso-bridge",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Bridges an Authelia forward_auth session into a native Umami login.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.13.1"
+  }
+}

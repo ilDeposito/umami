@@ -1,14 +1,14 @@
-FROM python:3.12-slim
+FROM node:20-alpine
 
-RUN useradd --create-home --shell /usr/sbin/nologin bridge
+RUN addgroup -S bridge && adduser -S bridge -G bridge
 WORKDIR /app
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY package.json package-lock.json* ./
+RUN npm install --omit=dev
 
-COPY app.py crypto.py ./
+COPY server.js crypto.js ./
 
 USER bridge
 
 EXPOSE 8000
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["node", "server.js"]
