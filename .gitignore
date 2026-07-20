@@ -6,3 +6,6 @@ backup/*
 umami.code*
 
 node_modules/
+
+.DS_store
+
